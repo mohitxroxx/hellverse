@@ -1,5 +1,6 @@
 const express = require("express");
 const Data = require("../models/data");
+const Team = require("../models/team");
 const bodyParser = require('body-parser')
 const fs = require('fs');
 const app = express();
@@ -41,6 +42,50 @@ app.get('/users/:id', async (req, res) => { //route to details of particular use
     if (!userData)
       return res.status(404).json({ msg: "No data found" })
     return res.status(200).json(userData)
+  } catch (error) {
+    console.error(error)
+    return res.status(400).json({ err: "Internal server error" })
+  }
+})
+
+app.get('/filter', async (req, res) => { //route to perform various filters
+  try {
+    const name = req.query.name
+    if (name) {
+      const splitName = name.split(" ")
+      const first_name = splitName[0]
+      const last_name = splitName.length > 1 ? splitName[1] : ''
+      const data = await Data.findOne({ first_name, last_name })
+      if (data)
+        return res.status(200).json(data)
+      return res.status(404).json({ msg: "No data found for this name" })
+    }
+    const _id = req.query.objID
+    if (_id) {
+      const data = await Data.findOne({ _id })
+      if (data)
+        return res.status(200).json(data)
+      return res.status(404).json({ msg: "No data found for this userID" })
+    }
+    const domain = req.query.domain
+    const available = req.query.available
+    console.log(available)
+    const gender = req.query.gender
+    if (!domain && !available && gender) {
+      const data = await Data.find({ gender })
+      return res.status(200).json(data)
+    }
+    if (!domain && available && !gender) {
+      const data = await Data.find({ available })
+      return res.status(200).json(data)
+    }
+    if (domain && !available && !gender) {
+      const data = await Data.find({ domain })
+      return res.status(200).json(data)
+    }
+    else
+      return res.status(400).json({ err: "domain, available status or gender is required to filter data" })
+
   } catch (error) {
     console.error(error)
     return res.status(400).json({ err: "Internal server error" })
@@ -105,6 +150,62 @@ app.delete('/users/:id', async (req, res) => { //route to delete the data of par
   } catch (error) {
     console.error(error)
     return res.status(400).json({ err: "Internal server error" })
+  }
+})
+
+app.post('/team', async (req, res) => { //route to create a team
+  try {
+    const { cart } = req.body;
+    const team = new Team();
+    const domains = new Set();
+
+    for (let id of cart) {
+      const user = await Data.findOne({ id, available: true });
+
+      if (!user) {
+        return res.status(400).json({ err: `User with id ${id} not found or not available` });
+      }
+
+      if (domains.has(user.domain)) {
+        return res.status(400).json({ err: `Domain ${user.domain} already exists in the team` });
+      }
+
+      domains.add(user.domain);
+      team.members.push(user._id);
+    }
+
+    team.domains = Array.from(domains);
+    await team.save();
+    return res.status(200).json({ msg: "Team created", team });
+  }
+  catch (error) {
+    console.error(error);
+    return res.status(500).json({ err: "Internal server error" });
+  }
+})
+app.get('/team', async (req, res) => { //route to view all teams
+  try {
+    const data = await Team.find({})
+    if (!data)
+      return res.status(404).json({ msg: "No data found" })
+    return res.status(200).json({ data });
+  }
+  catch (error) {
+    console.error(error);
+    return res.status(500).json({ err: "Internal server error" });
+  }
+})
+app.get('/team/:id', async (req, res) => { //route to view a particular team
+  try {
+    const _id = req.params.id
+    const data = await Team.findOne({ _id })
+    if (!data)
+      return res.status(404).json({ msg: "No data found" })
+    return res.status(200).json({ data });
+  }
+  catch (error) {
+    console.error(error);
+    return res.status(500).json({ err: "Internal server error" });
   }
 })
 module.exports = app;
