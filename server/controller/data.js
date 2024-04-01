@@ -207,5 +207,5 @@ app.get('/team/:id', async (req, res) => { //route to view a particular team
     console.error(error);
     return res.status(500).json({ err: "Internal server error" });
   }
-})
+}) 
 module.exports = app;
